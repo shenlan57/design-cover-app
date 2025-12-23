@@ -1,13 +1,13 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>V-Cover Pro | 艺术封面实验室</title>
+  <title>V-Cover AI | 艺术封面设计师</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
   <style>
+    :root { --accent: #F59E0B; }
     body {
       background-color: #000;
       color: #fff;
@@ -16,24 +16,23 @@
       display: flex; justify-content: center; align-items: center;
       min-height: 100vh; overflow: hidden;
     }
-    .app-viewport {
+    .app-container {
       width: 100vw; height: 100vh;
-      background: #080808;
-      position: relative;
-      overflow: hidden;
+      background: #0A0A0A;
       display: flex; flex-direction: column;
+      position: relative; overflow: hidden;
     }
     @media (min-width: 768px) {
       body { background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
-      .app-viewport {
-        width: 390px; height: 844px;
+      .app-container {
+        width: 390px; height: 844px; /* iPhone 14 Pro 尺寸 */
         border-radius: 48px;
-        border: 12px solid #1a1a1a;
+        border: 8px solid #1a1a1a;
         box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8);
       }
     }
-    .gold-text {
-      background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728);
+    .gold-gradient {
+      background: linear-gradient(135deg, #F59E0B 0%, #FCD34D 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
