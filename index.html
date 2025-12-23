@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>V-Cover | 艺术封面实验室</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+  <style>
+    :root { --gold: #d4af37; --bg: #030303; }
+    body {
+      background-color: var(--bg);
+      color: #ffffff;
+      font-family: 'Inter', "PingFang SC", sans-serif;
+      margin: 0; padding: 0;
+      -webkit-font-smoothing: antialiased;
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; overflow-x: hidden;
+    }
+    .font-display { font-family: 'Playfair Display', serif; }
+    
+    .gold-gradient-text {
+      background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.02);
+      backdrop-filter: blur(25px);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .app-container {
+      width: 100vw; height: 100vh;
+      background: #080808;
+      position: relative;
+      overflow-y: auto; overflow-x: hidden;
+      display: flex; flex-direction: column;
+    }
+
+    @media (min-width: 768px) {
+      body { background: radial-gradient(circle at center, #111 0%, #030303 100%); }
+      .app-container {
+        width: 420px; height: 840px;
+        border-radius: 44px;
+        border: 8px solid #1a1a1a;
+        box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9);
+        margin: 20px;
+      }
+    }
+
+    /* 高级自定义滚动条 */
+    .style-scrollbar::-webkit-scrollbar { height: 3px; }
+    .style-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; margin: 0 24px; }
+    .style-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(to right, #bf953f, #fbf5b7); border-radius: 10px; }
+
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    
+    @keyframes floating { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+    .animate-floating { animation: floating 4s ease-in-out infinite; }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@19.2.3",
+    "react-dom": "https://esm.sh/react-dom@19.2.3",
+    "react-dom/client": "https://esm.sh/react-dom@19.2.3/client",
+    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="module">
+    import React, { useState, useRef } from 'react';
+    import { createRoot } from 'react-dom/client';
+    import { GoogleGenAI } from "@google/genai";
+
+    const DESIGN_PRESETS = [
+      {
+        id: 'VOGUE',
+        name: '时尚画报',
+        thumbnail: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=400&h=600&auto=format&fit=crop',
+        prompt: 'editorial magazine cover, high-fashion layout, Vogue aesthetic, sharp shadows, elegant serif fonts, premium kerning'
+      },
+      {
+        id: 'MINIMAL',
+        name: '极简静奢',
+        thumbnail: 'https://images.unsplash.com/photo-1544450181-29597f6ee557?q=80&w=400&h=600&auto=format&fit=crop',
+        prompt: 'minimalist luxury cover, thin sans-serif typography, airy negative space, neutral tones, premium studio lighting'
+      },
+      {
+        id: 'BRUTAL',
+        name: '现代力量',
+        thumbnail: 'https://images.unsplash.com/photo-1533154683836-84ea7a0bc310?q=80&w=400&h=600&auto=format&fit=crop',
+        prompt: 'modern brutalist poster, bold heavy grotesque fonts, high contrast, industrial geometric layout, raw energy'
+      },
+      {
+        id: 'CYBER',
+        name: '霓虹幻想',
+        thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=400&h=600&auto=format&fit=crop',
+        prompt: 'cyberpunk aesthetic, holographic neon glowing typography, futuristic UI elements, vibrant cyan and magenta glints'
+      },
+      {
+        id: 'CINEMA',
+        name: '经典影像',
+        thumbnail: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=400&h=600&auto=format&fit=crop',
+        prompt: 'cinematic noir movie poster, dramatic chiaroscuro lighting, classic movie titling, moody film grain texture'
+      }
+    ];
+
+    const App = () => {
+      const [videoFrame, setVideoFrame] = useState(null);
+      const [selectedStyle, setSelectedStyle] = useState(DESIGN_PRESETS[0]);
+      const [title, setTitle] = useState('');
+      const [loading, setLoading] = useState(false);
+      const [result, setResult] = useState(null);
+      const [error, setError] = useState(null);
+      const fileRef = useRef(null);
+
+      const handleVideoUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setError(null);
+        const video = document.createElement('video');
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.onloadedmetadata = () => video.currentTime = video.duration / 4;
+        video.onseeked = () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(video, 0, 0);
+          setVideoFrame(canvas.toDataURL('image/jpeg'));
+          setResult(null); URL.revokeObjectURL(url);
+        };
+        video.onerror = () => setError("视频解析失败");
+      };
+
+      const startDesign = async () => {
+        if (!videoFrame) return;
+        setLoading(true); setError(null);
+        try {
+          const ai = new GoogleGenAI({ apiKey: window.process?.env?.API_KEY || "" });
+          const base64Data = videoFrame.split(',')[1];
+          
+          const planResponse = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: [{
+              parts: [
+                { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+                { text: `你是纽约顶级平面设计师。分析这张图的构图，为标题 "${title || 'MUSE'}" 规划位置。
+                  要求：文字必须避开脸部，利用画面留白。文字排版要极致高级（衬线或加粗无衬线），字距紧凑且有张力。
+                  结合风格：${selectedStyle.prompt}。仅输出生成描述。` }
+              ]
+            }]
+          });
+
+          const finalResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+              parts: [
+                { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
+                { text: `RECONSTRUCT AS A PROFESSIONAL 9:16 MAGAZINE COVER. 
+                  STRICT RULES:
+                  1. IDENTITY: The person from original image must remain identical and clear.
+                  2. TYPOGRAPHY: Overlay artistic, professional-grade text based on: ${planResponse.text}. 
+                  3. AESTHETIC: High-end color grading and lighting. Style: ${selectedStyle.prompt}.` }
+              ]
+            },
+            config: { imageConfig: { aspectRatio: "9:16" } }
+          });
+
+          const imagePart = finalResponse.candidates[0].content.parts.find(p => p.inlineData);
+          if (imagePart) {
+            setResult(`data:image/png;base64,${imagePart.inlineData.data}`);
+          } else throw new Error("AI生成中断");
+        } catch (err) {
+          setError("AI引擎繁忙，请确保 API 环境正确");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="app-container scrollbar-hide">
+          <header className="px-8 pt-12 pb-6 flex justify-between items-end">
+            <div>
+              <h1 className="font-display italic text-3xl gold-gradient-text leading-none">V-Cover</h1>
+              <p className="text-[7px] tracking-[0.5em] text-zinc-600 uppercase mt-2">Editorial AI Designer</p>
+            </div>
+            <div className="text-[9px] text-zinc-500 font-medium tracking-[0.2em] uppercase pb-1">v2.0 Master</div>
+          </header>
+
+          <main className="px-8 space-y-8 pb-44 overflow-y-auto scrollbar-hide">
+            {/* 主预览窗口 */}
+            <section className="relative w-full aspect-[9/16] rounded-[3rem] overflow-hidden shadow-2xl glass-panel animate-floating border border-white/5">
+              {loading && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl px-10 text-center">
+                  <div className="w-16 h-[1px] bg-amber-500 animate-pulse mb-8"></div>
+                  <p className="text-[10px] tracking-[0.8em] text-amber-100 uppercase animate-pulse">正在重构人物与排版</p>
+                  <p className="text-[8px] text-zinc-500 mt-4 tracking-[0.2em]">CRAFTING ARTISTIC HIERARCHY...</p>
+                </div>
+              )}
+              {result ? (
+                <img src={result} className="w-full h-full object-cover animate-in fade-in duration-1000" />
+              ) : videoFrame ? (
+                <img src={videoFrame} className="w-full h-full object-cover opacity-40 grayscale" />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center space-y-6 cursor-pointer" onClick={() => fileRef.current.click()}>
+                  <div className="w-20 h-20 rounded-full border border-dashed border-zinc-800 flex items-center justify-center hover:border-zinc-500 transition-colors">
+                    <svg className="w-6 h-6 text-zinc-800" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="1"/></svg>
+                  </div>
+                  <p className="text-[10px] uppercase tracking-[0.4em] text-zinc-700">导入竖屏原视频素材</p>
+                </div>
+              )}
+            </section>
+
+            {/* 交互控件 */}
+            <div className="space-y-10 animate-in slide-in-from-bottom duration-700">
+              <div className="space-y-4">
+                <div className="flex justify-between items-end px-1">
+                  <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500">封面排版风格</h3>
+                  <span className="text-[10px] text-amber-500 font-medium italic">{selectedStyle.name}</span>
+                </div>
+                <div className="flex gap-4 overflow-x-auto style-scrollbar pb-6">
+                  {DESIGN_PRESETS.map(s => (
+                    <div 
+                      key={s.id} onClick={() => setSelectedStyle(s)} 
+                      className={`flex-shrink-0 w-28 aspect-[3/4] rounded-2xl overflow-hidden border transition-all duration-500 cursor-pointer ${selectedStyle.id === s.id ? 'border-amber-500 scale-95 shadow-xl shadow-amber-500/10' : 'border-white/5 opacity-20 grayscale'}`}
+                    >
+                      <img src={s.thumbnail} className="w-full h-full object-cover" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4 px-1">
+                <h3 className="text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500">自定义艺术字内容</h3>
+                <input 
+                  value={title} onChange={e => setTitle(e.target.value)} 
+                  placeholder="例如：主标题 'PARIS'、加入颗粒感..." 
+                  className="w-full bg-transparent border-b border-zinc-900 text-[11px] py-4 focus:border-amber-500 outline-none transition-colors placeholder:text-zinc-800 text-zinc-200"
+                />
+              </div>
+            </div>
+          </main>
+
+          {/* 底部功能栏 */}
+          <div className="fixed bottom-0 left-0 right-0 p-10 bg-gradient-to-t from-black via-black/90 to-transparent z-50">
+            <div className="max-w-[420px] mx-auto flex gap-4">
+              <button onClick={() => fileRef.current.click()} className="w-16 h-16 rounded-3xl bg-zinc-900 border border-white/5 flex items-center justify-center transition-all active:scale-90">
+                <svg className="w-5 h-5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" strokeWidth="1.2"/></svg>
+              </button>
+              <input ref={fileRef} type="file" className="hidden" accept="video/*" onChange={handleVideoUpload} />
+              
+              <button 
+                onClick={startDesign} disabled={!videoFrame || loading}
+                className={`flex-1 rounded-3xl text-[11px] font-bold uppercase tracking-[0.5em] transition-all duration-700 active:scale-95 ${!videoFrame || loading ? 'bg-zinc-800 text-zinc-700' : 'bg-white text-black shadow-2xl hover:bg-zinc-100'}`}
+              >
+                {loading ? '正在设计中' : '生成艺术封面'}
+              </button>
+
+              {result && (
+                <button onClick={() => { const a = document.createElement('a'); a.href = result; a.download = 'vcover-art.png'; a.click(); }} className="w-16 h-16 rounded-3xl bg-amber-500 flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                  <svg className="w-5 h-5 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" strokeWidth="2"/></svg>
+                </button>
+              )}
+            </div>
+            {error && <p className="text-[9px] text-red-500/80 text-center mt-6 tracking-widest uppercase">{error}</p>}
+          </div>
+        </div>
+      );
+    };
+
+    createRoot(document.getElementById('root')).render(<App />);
+  </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>
