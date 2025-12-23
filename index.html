@@ -1,56 +1,43 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>V-Cover AI | 艺术封面实验室</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>V-Cover Pro | 艺术封面实验室</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@300;400;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
   <style>
-    :root { --gold: #d4af37; --bg: #030303; }
     body {
-      background-color: var(--bg);
-      color: #ffffff;
-      font-family: 'Inter', "PingFang SC", sans-serif;
+      background-color: #000;
+      color: #fff;
+      font-family: 'Inter', system-ui, sans-serif;
       margin: 0; padding: 0;
-      -webkit-font-smoothing: antialiased;
       display: flex; justify-content: center; align-items: center;
-      min-height: 100vh; overflow-x: hidden;
+      min-height: 100vh; overflow: hidden;
     }
-    .font-display { font-family: 'Playfair Display', serif; }
-    .gold-gradient-text {
-      background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728, #fbf5b7, #aa771c);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.02);
-      backdrop-filter: blur(25px);
-      border: 1px solid rgba(255, 255, 255, 0.05);
-    }
-    .app-container {
+    .app-viewport {
       width: 100vw; height: 100vh;
       background: #080808;
       position: relative;
-      overflow-y: auto; overflow-x: hidden;
+      overflow: hidden;
       display: flex; flex-direction: column;
     }
     @media (min-width: 768px) {
-      body { background: radial-gradient(circle at center, #111 0%, #030303 100%); }
-      .app-container {
-        width: 420px; height: 840px;
-        border-radius: 44px;
-        border: 8px solid #1a1a1a;
-        box-shadow: 0 50px 100px -20px rgba(0,0,0,0.9);
-        margin: 20px;
+      body { background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%); }
+      .app-viewport {
+        width: 390px; height: 844px;
+        border-radius: 48px;
+        border: 12px solid #1a1a1a;
+        box-shadow: 0 50px 100px -20px rgba(0,0,0,0.8);
       }
     }
-    .style-scrollbar::-webkit-scrollbar { height: 3px; }
-    .style-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); border-radius: 10px; margin: 0 24px; }
-    .style-scrollbar::-webkit-scrollbar-thumb { background: linear-gradient(to right, #bf953f, #fbf5b7); border-radius: 10px; }
+    .gold-text {
+      background: linear-gradient(to right, #bf953f, #fcf6ba, #b38728);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
     .scrollbar-hide::-webkit-scrollbar { display: none; }
-    @keyframes floating { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
-    .animate-floating { animation: floating 4s ease-in-out infinite; }
   </style>
   <script type="importmap">
 {
@@ -68,181 +55,7 @@
 </head>
 <body>
   <div id="root"></div>
-
-  <script type="module">
-    import React, { useState, useRef } from 'react';
-    import { createRoot } from 'react-dom/client';
-    import { GoogleGenAI } from "@google/genai";
-
-    const DESIGN_PRESETS = [
-      {
-        id: 'VOGUE',
-        name: '时尚画报',
-        thumbnail: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=400&h=600&auto=format&fit=crop',
-        prompt: 'editorial magazine cover, high-fashion layout, Vogue aesthetic, sharp shadows, elegant serif fonts, premium kerning'
-      },
-      {
-        id: 'MINIMAL',
-        name: '极简静奢',
-        thumbnail: 'https://images.unsplash.com/photo-1544450181-29597f6ee557?q=80&w=400&h=600&auto=format&fit=crop',
-        prompt: 'minimalist luxury cover, thin sans-serif typography, airy negative space, neutral tones, premium quiet luxury'
-      },
-      {
-        id: 'BRUTAL',
-        name: '现代力量',
-        thumbnail: 'https://images.unsplash.com/photo-1533154683836-84ea7a0bc310?q=80&w=400&h=600&auto=format&fit=crop',
-        prompt: 'modern brutalist poster, bold heavy grotesque fonts, high contrast, industrial geometric layout'
-      },
-      {
-        id: 'CYBER',
-        name: '霓虹幻想',
-        thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?q=80&w=400&h=600&auto=format&fit=crop',
-        prompt: 'cyberpunk aesthetic, holographic neon glowing typography, futuristic UI elements, synthwave vibes'
-      },
-      {
-        id: 'CINEMA',
-        name: '经典影像',
-        thumbnail: 'https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=400&h=600&auto=format&fit=crop',
-        prompt: 'cinematic movie poster, dramatic noir lighting, classic movie titling, moody film grain'
-      }
-    ];
-
-    const App = () => {
-      const [videoFrame, setVideoFrame] = useState(null);
-      const [selectedStyle, setSelectedStyle] = useState(DESIGN_PRESETS[0]);
-      const [title, setTitle] = useState('');
-      const [loading, setLoading] = useState(false);
-      const [result, setResult] = useState(null);
-      const [error, setError] = useState(null);
-      const fileRef = useRef(null);
-
-      const handleVideoUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const video = document.createElement('video');
-        const url = URL.createObjectURL(file);
-        video.src = url;
-        video.onloadedmetadata = () => video.currentTime = video.duration / 4;
-        video.onseeked = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(video, 0, 0);
-          setVideoFrame(canvas.toDataURL('image/jpeg'));
-          setResult(null); URL.revokeObjectURL(url);
-        };
-      };
-
-      const startDesign = async () => {
-        if (!videoFrame) return;
-        setLoading(true); setError(null);
-        try {
-          const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "" });
-          const base64Data = videoFrame.split(',')[1];
-          
-          // 步骤1：布局规划
-          const planResponse = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview',
-            contents: [{
-              parts: [
-                { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-                { text: `你是纽约顶级平面设计师。分析这张图的构图，为标题 "${title || 'MUSE'}" 规划位置。文字排版要极致高级，利用画面留白。结合风格：${selectedStyle.prompt}。仅输出生成描述。` }
-              ]
-            }]
-          });
-
-          // 步骤2：艺术封面生成
-          const finalResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: {
-              parts: [
-                { inlineData: { mimeType: 'image/jpeg', data: base64Data } },
-                { text: `RECONSTRUCT AS A HIGH-END 9:16 COVER. Keep the person identical. Typography rules: ${planResponse.text}. Style aesthetic: ${selectedStyle.prompt}. Result must be professional graphic design.` }
-              ]
-            },
-            config: { imageConfig: { aspectRatio: "9:16" } }
-          });
-
-          const imagePart = finalResponse.candidates[0].content.parts.find(p => p.inlineData);
-          if (imagePart) setResult(`data:image/png;base64,${imagePart.inlineData.data}`);
-        } catch (err) {
-          setError("请确保 API_KEY 已正确配置");
-        } finally {
-          setLoading(false);
-        }
-      };
-
-      return React.createElement('div', { className: 'app-container scrollbar-hide' },
-        React.createElement('header', { className: 'px-8 pt-12 pb-6 flex justify-between items-end' },
-          React.createElement('div', null,
-            React.createElement('h1', { className: 'font-display italic text-3xl gold-gradient-text leading-none' }, 'V-Cover'),
-            React.createElement('p', { className: 'text-[7px] tracking-[0.5em] text-zinc-600 uppercase mt-2' }, 'Editorial AI Designer')
-          ),
-          React.createElement('div', { className: 'text-[9px] text-zinc-500 font-medium tracking-[0.2em] uppercase pb-1' }, 'v2.1 Pro')
-        ),
-        React.createElement('main', { className: 'px-8 space-y-8 pb-44 overflow-y-auto scrollbar-hide' },
-          React.createElement('section', { className: 'relative w-full aspect-[9/16] rounded-[3rem] overflow-hidden shadow-2xl glass-panel animate-floating border border-white/5' },
-            loading && React.createElement('div', { className: 'absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/90 backdrop-blur-3xl px-10 text-center' },
-              React.createElement('div', { className: 'w-16 h-[1px] bg-amber-500 animate-pulse mb-8' }),
-              React.createElement('p', { className: 'text-[10px] tracking-[0.8em] text-amber-100 uppercase animate-pulse' }, '重塑人物与排版美学')
-            ),
-            result ? React.createElement('img', { src: result, className: 'w-full h-full object-cover animate-in fade-in duration-1000' }) :
-            videoFrame ? React.createElement('img', { src: videoFrame, className: 'w-full h-full object-cover opacity-40 grayscale' }) :
-            React.createElement('div', { className: 'absolute inset-0 flex flex-col items-center justify-center space-y-6 cursor-pointer', onClick: () => fileRef.current.click() },
-              React.createElement('div', { className: 'w-20 h-20 rounded-full border border-dashed border-zinc-800 flex items-center justify-center hover:border-zinc-500 transition-colors' },
-                React.createElement('svg', { className: 'w-6 h-6 text-zinc-800', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, React.createElement('path', { d: 'M12 4v16m8-8H4', strokeWidth: '1' }))
-              ),
-              React.createElement('p', { className: 'text-[10px] uppercase tracking-[0.4em] text-zinc-700' }, '上传竖屏视频素材')
-            )
-          ),
-          React.createElement('div', { className: 'space-y-10 animate-in slide-in-from-bottom duration-700' },
-            React.createElement('div', { className: 'space-y-4' },
-              React.createElement('div', { className: 'flex justify-between items-end px-1' },
-                React.createElement('h3', { className: 'text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500' }, '排版风格'),
-                React.createElement('span', { className: 'text-[10px] text-amber-500 italic' }, selectedStyle.name)
-              ),
-              React.createElement('div', { className: 'flex gap-4 overflow-x-auto style-scrollbar pb-6' },
-                DESIGN_PRESETS.map(s => React.createElement('div', {
-                  key: s.id,
-                  onClick: () => setSelectedStyle(s),
-                  className: `flex-shrink-0 w-28 aspect-[3/4] rounded-2xl overflow-hidden border transition-all duration-500 cursor-pointer ${selectedStyle.id === s.id ? 'border-amber-500 scale-95 shadow-xl shadow-amber-500/10' : 'border-white/5 opacity-20 grayscale'}`
-                }, React.createElement('img', { src: s.thumbnail, className: 'w-full h-full object-cover' })))
-              )
-            ),
-            React.createElement('div', { className: 'space-y-4 px-1' },
-              React.createElement('h3', { className: 'text-[10px] font-bold uppercase tracking-[0.3em] text-zinc-500' }, '封面主标题'),
-              React.createElement('input', {
-                value: title,
-                onChange: e => setTitle(e.target.value),
-                placeholder: "例如：DREAM, PARIS, VIBE...",
-                className: 'w-full bg-transparent border-b border-zinc-900 text-[11px] py-4 focus:border-amber-500 outline-none transition-colors text-zinc-200'
-              })
-            )
-          )
-        ),
-        React.createElement('div', { className: 'fixed bottom-0 left-0 right-0 p-10 bg-gradient-to-t from-black via-black/90 to-transparent z-50' },
-          React.createElement('div', { className: 'max-w-[420px] mx-auto flex gap-4' },
-            React.createElement('button', { onClick: () => fileRef.current.click(), className: 'w-16 h-16 rounded-3xl bg-zinc-900 border border-white/5 flex items-center justify-center active:scale-90 transition-all' },
-              React.createElement('svg', { className: 'w-5 h-5 text-zinc-500', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, React.createElement('path', { d: 'M12 4v16m8-8H4', strokeWidth: '1.2' }))
-            ),
-            React.createElement('input', { ref: fileRef, type: 'file', className: 'hidden', accept: 'video/*', onChange: handleVideoUpload }),
-            React.createElement('button', {
-              onClick: startDesign,
-              disabled: !videoFrame || loading,
-              className: `flex-1 rounded-3xl text-[11px] font-bold uppercase tracking-[0.5em] transition-all duration-700 active:scale-95 ${!videoFrame || loading ? 'bg-zinc-800 text-zinc-700' : 'bg-white text-black shadow-2xl shadow-white/5'}`
-            }, loading ? '正在生成艺术封面' : '立即生成封面'),
-            result && React.createElement('button', {
-              onClick: () => { const a = document.createElement('a'); a.href = result; a.download = 'vcover-art.png'; a.click(); },
-              className: 'w-16 h-16 rounded-3xl bg-amber-500 flex items-center justify-center active:scale-90 transition-all'
-            }, React.createElement('svg', { className: 'w-5 h-5 text-black', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, React.createElement('path', { d: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4', strokeWidth: '2' })))
-          ),
-          error && React.createElement('p', { className: 'text-[9px] text-red-500/80 text-center mt-6 tracking-widest uppercase' }, error)
-        )
-      );
-    };
-
-    createRoot(document.getElementById('root')).render(React.createElement(App));
-  </script>
+  <script type="module" src="index.tsx"></script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>
